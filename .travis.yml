@@ -1,0 +1,93 @@
+language: cpp
+
+dist: trusty
+
+sudo: false
+
+env:
+  global:
+    - SCONS_CACHE_ROOT=$HOME/.scons_cache
+
+cache:
+  directories:
+    - $SCONS_CACHE_ROOT
+
+matrix:
+  include:
+    - env: STATIC_CHECKS=yes
+      os: linux
+      compiler: clang
+    - env: GODOT_TARGET=x11 TOOLS=yes
+      os: linux
+      compiler: gcc
+    - env: GODOT_TARGET=x11 TOOLS=no
+      os: linux
+      compiler: clang
+    #- env: GODOT_TARGET=windows TOOLS=yes
+    #  os: linux
+    #  compiler: gcc
+    - env: GODOT_TARGET=android TOOLS=no
+      os: linux
+      compiler: gcc
+    - env: GODOT_TARGET=osx TOOLS=yes
+      os: osx
+      compiler: clang
+    #- env: GODOT_TARGET=iphone TOOLS=no
+    #  os: osx
+    #  compiler: clang
+
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+      - llvm-toolchain-trusty-3.9
+    packages:
+      - build-essential
+      - scons
+      - pkg-config
+      - libx11-dev
+      - libxcursor-dev
+      - libasound2-dev
+      - libfreetype6-dev
+      - libgl1-mesa-dev
+      - libglu1-mesa-dev
+      - libssl-dev
+      - libxinerama-dev
+      - libxrandr-dev
+
+      # For cross-compiling to Windows.
+      #- binutils-mingw-w64-i686
+      #- binutils-mingw-w64-x86-64
+      #- gcc-mingw-w64-i686
+      #- gcc-mingw-w64-x86-64
+      #- g++-mingw-w64-i686
+      #- g++-mingw-w64-x86-64
+      #- mingw-w64
+
+      # For style checks.
+      - clang-format-3.9
+
+install:
+  - if [ "$TRAVIS_OS_NAME" = "linux" ] && [ "$GODOT_TARGET" = "android" ]; then
+      misc/travis/android-tools-linux.sh;
+    fi
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then
+      misc/travis/scons-local-osx.sh;
+    fi
+  - if [ "$TRAVIS_OS_NAME" = "osx" ] && [ "$GODOT_TARGET" = "android" ]; then
+      misc/travis/android-tools-osx.sh;
+    fi
+
+before_script:
+  - if [ "$GODOT_TARGET" = "android" ]; then
+      export ANDROID_HOME=$TRAVIS_BUILD_DIR/godot-dev/build-tools/android-sdk;
+      export ANDROID_NDK_ROOT=$TRAVIS_BUILD_DIR/godot-dev/build-tools/android-ndk;
+    fi
+
+script:
+  - if [ "$STATIC_CHECKS" = "yes" ]; then
+      sh ./misc/travis/clang-format.sh;
+    else
+      export SCONS_CACHE=$SCONS_CACHE_ROOT/${GODOT_TARGET}-${CXX}-tools_${TOOLS}/;
+      scons -j2 CC=$CC CXX=$CXX platform=$GODOT_TARGET TOOLS=$TOOLS verbose=yes progress=no;
+    fi
